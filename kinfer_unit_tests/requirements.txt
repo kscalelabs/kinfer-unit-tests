@@ -1,2 +1,15 @@
 # requirements.txt
 
+# Robotics and simulation
+kinfer
+ksim
+mujoco
+mujoco-scenes
+
+# Machine learning and numerical computing
+jax
+jaxtyping
+
+# Logging
+colorlogging
+
