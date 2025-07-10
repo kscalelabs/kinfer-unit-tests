@@ -182,7 +182,7 @@ def build_kinfer_file(recipe: Recipe, joint_names: list[str], out_dir: Path) -> 
 def main() -> None:
     colorlogging.configure()
     parser = argparse.ArgumentParser()
-    default_output = Path(__file__).parent / "outputs"
+    default_output = Path(__file__).parent / "assets"
     parser.add_argument(
         "--output",
         "-o",
