@@ -1,6 +1,12 @@
 # kinfer-unit-tests
 Create kinfer files to test kscale robot functionality
 
+
+
+https://github.com/user-attachments/assets/0e03a622-3d84-4495-81f8-4f67c7a7e673
+
+
+
 ## Install 
 
 ```bash
