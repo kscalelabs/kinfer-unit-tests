@@ -2,6 +2,7 @@
 
 # Robotics and simulation
 kinfer
+kinfer-sim
 ksim
 mujoco
 mujoco-scenes
