@@ -1,11 +1,7 @@
 # kinfer-unit-tests
 Create kinfer files to test kscale robot functionality
 
-
-
 https://github.com/user-attachments/assets/0e03a622-3d84-4495-81f8-4f67c7a7e673
-
-
 
 ## Install 
 
@@ -24,11 +20,11 @@ There are currently 3 recipes:
 
 Make the kinfer files with 
 ```bash
-# cd to kinfer-sim root
-python tests/simple_kinfer_tests/make_test_kinfers.py 
+# cd to repo root
+python kinfer_unit_tests/make_test_kinfers.py 
 ```
 
 then run any of the files with
 ```bash
-kinfer-sim tests/simple_kinfer_tests/outputs/kbot_sine_motion.kinfer kbot --use-keyboard --suspend
+kinfer-sim kinfer_unit_tests/assets/kbot_sine_motion.kinfer kbot --use-keyboard --suspend
 ```
