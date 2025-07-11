@@ -50,6 +50,29 @@ JOINT_BIASES: list[tuple[str, float, float]] = [
     ("dof_left_ankle_02", math.radians(-30.0), 1.0),  # 19
 ]
 
+JOINT_INVERSIONS: list[tuple[str, int]] = [
+    ("dof_right_shoulder_pitch_03", 1),  # 0
+    ("dof_right_shoulder_roll_03", 1),  # 1
+    ("dof_right_shoulder_yaw_02", 1),  # 2
+    ("dof_right_elbow_02", -1),  # 3
+    ("dof_right_wrist_00", 1),  # 4
+    ("dof_left_shoulder_pitch_03", 1),  # 5
+    ("dof_left_shoulder_roll_03", 1),  # 6
+    ("dof_left_shoulder_yaw_02", 1),  # 7
+    ("dof_left_elbow_02", 1),  # 8
+    ("dof_left_wrist_00", 1),  # 9
+    ("dof_right_hip_pitch_04", -1),  # 10
+    ("dof_right_hip_roll_03", 1),  # 11
+    ("dof_right_hip_yaw_03", 1),  # 12
+    ("dof_right_knee_04", -1),  # 13
+    ("dof_right_ankle_02", -1),  # 14
+    ("dof_left_hip_pitch_04", 1),  # 15
+    ("dof_left_hip_roll_03", 1),  # 16
+    ("dof_left_hip_yaw_03", 1),  # 17
+    ("dof_left_knee_04", 1),  # 18
+    ("dof_left_ankle_02", 1),  # 19
+]
+
 
 InitFn = Callable[[], Array]
 
@@ -107,6 +130,12 @@ def get_bias_vector(joint_names: list[str]) -> jnp.ndarray:
     """Return an array of neutral/bias angles ordered like `joint_names`."""
     bias_map = {name: bias for name, bias, _ in JOINT_BIASES}
     return jnp.array([bias_map[name] for name in joint_names])
+
+
+def get_inversion_vector(joint_names: list[str]) -> jnp.ndarray:
+    """Return an array of inversion factors (-1 or 1) ordered like `joint_names`."""
+    inversion_map = {name: inversion for name, inversion in JOINT_INVERSIONS}
+    return jnp.array([inversion_map[name] for name in joint_names])
 
 
 def make_bias_recipe(joint_names: list[str], dt: float) -> Recipe:
@@ -202,6 +231,94 @@ def make_single_joint_linear_recipe(
     )
 
 
+def get_left_right_pairs(joint_names: list[str]) -> list[tuple[int, int]]:
+    """Return (left_idx, right_idx) pairs for joints that share the same name.
+
+    Ex: ('dof_left_elbow_02', 'dof_right_elbow_02').
+    """
+    pairs: list[tuple[int, int]] = []
+    for i_left, name in enumerate(joint_names):
+        if "dof_left_" in name:
+            right_name = name.replace("dof_left_", "dof_right_")
+            if right_name in joint_names:
+                i_right = joint_names.index(right_name)
+                pairs.append((i_left, i_right))
+    return pairs
+
+
+def make_echo_recipe(joint_names: list[str], dt: float) -> Recipe:
+    """Left-side joints run a small sine wave.
+
+    Right-side joints copy (echo) the *observed* pose of their left counterparts.
+    """
+    num_joints = len(joint_names)
+    bias_vec = get_bias_vector(joint_names)
+    inversion_vec = get_inversion_vector(joint_names)
+    lr_pairs = get_left_right_pairs(joint_names)
+
+    left_idx, right_idx = zip(*lr_pairs)
+    left_idx_arr = jnp.array(left_idx, dtype=jnp.int32)  # (L,)
+    right_idx_arr = jnp.array(right_idx, dtype=jnp.int32)  # (L,)
+
+    amps = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][0] for i in left_idx])  # (L,)
+    freqs = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][1] for i in left_idx])  # (L,)
+
+    idxs = jnp.arange(num_joints)  # (J,)
+    carry_size = (1,)  # [time]
+
+    @jax.jit
+    def init_fn() -> Array:
+        return jnp.zeros(carry_size)
+
+    @jax.jit
+    def step_fn(
+        joint_angles: Array,
+        joint_angular_velocities: Array,
+        quaternion: Array,
+        initial_heading: Array,
+        command: Array,
+        carry: Array,
+    ) -> tuple[Array, Array]:
+        t = carry[0] + dt
+
+        left_offsets = amps * jnp.sin(2 * jnp.pi * freqs * t)  # (L,)
+
+        # Make a full-length vector of offsets for the left limbs.
+        # i.e. Left offset if it's a left limb, 0 otherwise.
+        offsets_full = jnp.sum(  # (J,)
+            jnp.where(
+                idxs[:, None] == left_idx_arr,  # shape (J,L) bool
+                left_offsets[None, :],  # broadcast (1,L) → (J,L)
+                0.0,
+            ),
+            axis=1,
+        )
+
+        left_angles_now = joint_angles[left_idx_arr]
+        right_targets = jnp.sum(
+            jnp.where(
+                idxs[:, None] == right_idx_arr,  # shape (J,L) bool
+                left_angles_now[None, :],
+                0.0,
+            ),
+            axis=1,
+        )
+
+        right_mask = jnp.sum(idxs[:, None] == right_idx_arr, axis=1).astype(bool)
+
+        # Sine for left limbs
+        targets = bias_vec + offsets_full
+        # Echo for right limbs
+        targets = jnp.where(right_mask, right_targets, targets)
+
+        # Apply joint inversions
+        targets = targets * inversion_vec
+
+        return targets, jnp.array([t])
+
+    return Recipe("kbot_echo_test", init_fn, step_fn, NUM_COMMANDS, carry_size)
+
+
 def build_kinfer_file(recipe: Recipe, joint_names: list[str], out_dir: Path) -> Path:
     """Build a kinfer file for a given recipe."""
     metadata = PyModelMetadata(
@@ -253,6 +370,7 @@ def main() -> None:
             joint_names=joint_names,
             dt=SIM_DT,
         ),
+        make_echo_recipe(joint_names=joint_names, dt=SIM_DT),
     ]
     for recipe in recipes:
         out_path = build_kinfer_file(recipe, joint_names, out_dir)
