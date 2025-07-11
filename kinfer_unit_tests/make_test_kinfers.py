@@ -28,26 +28,26 @@ NUM_COMMANDS = 6  # placeholder for tests
 
 # Joint biases, these are in the order that they appear in the neural network.
 JOINT_BIASES: list[tuple[str, float, float]] = [
-    ("dof_right_shoulder_pitch_03", 0.0, 1.0),
-    ("dof_right_shoulder_roll_03", math.radians(-10.0), 1.0),
-    ("dof_right_shoulder_yaw_02", 0.0, 1.0),
-    ("dof_right_elbow_02", math.radians(90.0), 1.0),
-    ("dof_right_wrist_00", 0.0, 1.0),
-    ("dof_left_shoulder_pitch_03", 0.0, 1.0),
-    ("dof_left_shoulder_roll_03", math.radians(10.0), 1.0),
-    ("dof_left_shoulder_yaw_02", 0.0, 1.0),
-    ("dof_left_elbow_02", math.radians(-90.0), 1.0),
-    ("dof_left_wrist_00", 0.0, 1.0),
-    ("dof_right_hip_pitch_04", math.radians(-20.0), 0.01),
-    ("dof_right_hip_roll_03", math.radians(-0.0), 2.0),
-    ("dof_right_hip_yaw_03", 0.0, 2.0),
-    ("dof_right_knee_04", math.radians(-50.0), 0.01),
-    ("dof_right_ankle_02", math.radians(30.0), 1.0),
-    ("dof_left_hip_pitch_04", math.radians(20.0), 0.01),
-    ("dof_left_hip_roll_03", math.radians(0.0), 2.0),
-    ("dof_left_hip_yaw_03", 0.0, 2.0),
-    ("dof_left_knee_04", math.radians(50.0), 0.01),
-    ("dof_left_ankle_02", math.radians(-30.0), 1.0),
+    ("dof_right_shoulder_pitch_03", 0.0, 1.0),  # 0
+    ("dof_right_shoulder_roll_03", math.radians(-10.0), 1.0),  # 1
+    ("dof_right_shoulder_yaw_02", 0.0, 1.0),  # 2
+    ("dof_right_elbow_02", math.radians(90.0), 1.0),  # 3
+    ("dof_right_wrist_00", 0.0, 1.0),  # 4
+    ("dof_left_shoulder_pitch_03", 0.0, 1.0),  # 5
+    ("dof_left_shoulder_roll_03", math.radians(10.0), 1.0),  # 6
+    ("dof_left_shoulder_yaw_02", 0.0, 1.0),  # 7
+    ("dof_left_elbow_02", math.radians(-90.0), 1.0),  # 8
+    ("dof_left_wrist_00", 0.0, 1.0),  # 9
+    ("dof_right_hip_pitch_04", math.radians(-20.0), 0.01),  # 10
+    ("dof_right_hip_roll_03", math.radians(-0.0), 2.0),  # 11
+    ("dof_right_hip_yaw_03", 0.0, 2.0),  # 12
+    ("dof_right_knee_04", math.radians(-50.0), 0.01),  # 13
+    ("dof_right_ankle_02", math.radians(30.0), 1.0),  # 14
+    ("dof_left_hip_pitch_04", math.radians(20.0), 0.01),  # 15
+    ("dof_left_hip_roll_03", math.radians(0.0), 2.0),  # 16
+    ("dof_left_hip_yaw_03", 0.0, 2.0),  # 17
+    ("dof_left_knee_04", math.radians(50.0), 0.01),  # 18
+    ("dof_left_ankle_02", math.radians(-30.0), 1.0),  # 19
 ]
 
 
@@ -64,6 +64,8 @@ class Recipe:
     name: str
     init_fn: InitFn
     step_fn: StepFn
+    num_commands: int
+    carry_size: tuple[int, ...]
 
 
 def get_mujoco_model() -> mujoco.MjModel:
@@ -80,11 +82,11 @@ def get_joint_names() -> list[str]:
 
 def make_zero_recipe(num_joints: int, dt: float) -> Recipe:
     """Sends zeros to all the joints."""
-    carry_shape = (1,)
+    carry_size = (1,)
 
     @jax.jit
     def init_fn() -> Array:
-        return jnp.zeros(carry_shape)
+        return jnp.zeros(carry_size)
 
     @jax.jit
     def step_fn(
@@ -98,7 +100,7 @@ def make_zero_recipe(num_joints: int, dt: float) -> Recipe:
         t = carry[0] + dt
         return jnp.zeros(num_joints), jnp.array([t])
 
-    return Recipe("kbot_zero_position", init_fn, step_fn)
+    return Recipe("kbot_zero_position", init_fn, step_fn, NUM_COMMANDS, carry_size)
 
 
 def get_bias_vector(joint_names: list[str]) -> jnp.ndarray:
@@ -110,11 +112,11 @@ def get_bias_vector(joint_names: list[str]) -> jnp.ndarray:
 def make_bias_recipe(joint_names: list[str], dt: float) -> Recipe:
     """Sends the bias values to all the joints."""
     bias_vec = get_bias_vector(joint_names)
-    carry_shape = (1,)
+    carry_size = (1,)
 
     @jax.jit
     def init_fn() -> Array:
-        return jnp.zeros(carry_shape)
+        return jnp.zeros(carry_size)
 
     @jax.jit
     def step_fn(
@@ -128,7 +130,7 @@ def make_bias_recipe(joint_names: list[str], dt: float) -> Recipe:
         t = carry[0] + dt
         return bias_vec, jnp.array([t])
 
-    return Recipe("kbot_bias_position", init_fn, step_fn)
+    return Recipe("kbot_bias_position", init_fn, step_fn, NUM_COMMANDS, carry_size)
 
 
 # (amplitude [rad], frequency [Hz]) for each joint name
@@ -140,11 +142,11 @@ def make_sine_recipe(joint_names: list[str], dt: float) -> Recipe:
     bias_vec = get_bias_vector(joint_names)
     amps = jnp.array([JOINT_SINE_PARAMS[n][0] for n in joint_names])
     freqs = jnp.array([JOINT_SINE_PARAMS[n][1] for n in joint_names])
-    carry_shape = (1,)
+    carry_size = (1,)
 
     @jax.jit
     def init_fn() -> Array:
-        return jnp.zeros(carry_shape)
+        return jnp.zeros(carry_size)
 
     @jax.jit
     def step_fn(
@@ -159,15 +161,53 @@ def make_sine_recipe(joint_names: list[str], dt: float) -> Recipe:
         offsets = amps * jnp.sin(2 * jnp.pi * freqs * t)
         return bias_vec + offsets, jnp.array([t])
 
-    return Recipe("kbot_sine_motion", init_fn, step_fn)
+    return Recipe("kbot_sine_motion", init_fn, step_fn, NUM_COMMANDS, carry_size)
+
+
+def make_single_joint_linear_recipe(
+    target_joint_name: str, start_pos: float, end_pos: float, num_steps: int, joint_names: list[str], dt: float
+) -> Recipe:
+    """Moves a single joint linearly from its current position to a target position."""
+    bias_vec = get_bias_vector(joint_names)
+    target_joint_idx = joint_names.index(target_joint_name)
+    carry_size = (1,)  # [time]
+    total_duration = num_steps * dt  # Total time for the motion
+
+    @jax.jit
+    def init_fn() -> Array:
+        return jnp.zeros(carry_size)
+
+    @jax.jit
+    def step_fn(
+        joint_angles: Array,
+        joint_angular_velocities: Array,
+        quaternion: Array,
+        initial_heading: Array,
+        command: Array,
+        carry: Array,
+    ) -> tuple[Array, Array]:
+        t = carry[0] + dt
+
+        # Calculate linear interpolation based on elapsed time
+        progress = jnp.minimum(t / total_duration, 1.0)
+        target_pos = start_pos + (end_pos - start_pos) * progress
+
+        # Set all joints to bias except target joint
+        targets = bias_vec.at[target_joint_idx].set(target_pos)
+
+        return targets, jnp.array([t])
+
+    return Recipe(
+        f"kbot_linear_{target_joint_name}_{start_pos}_to_{end_pos}", init_fn, step_fn, NUM_COMMANDS, carry_size
+    )
 
 
 def build_kinfer_file(recipe: Recipe, joint_names: list[str], out_dir: Path) -> Path:
     """Build a kinfer file for a given recipe."""
     metadata = PyModelMetadata(
         joint_names=joint_names,
-        num_commands=NUM_COMMANDS,
-        carry_size=(1,),
+        num_commands=recipe.num_commands,
+        carry_size=recipe.carry_size,
     )
     kinfer_blob = pack(
         export_fn(recipe.init_fn, metadata),  # type: ignore[arg-type]
@@ -202,9 +242,17 @@ def main() -> None:
     logger.info("Joint names: %s", joint_names)
 
     recipes = [
-        make_zero_recipe(num_joints, SIM_DT),
-        make_bias_recipe(joint_names, SIM_DT),
-        make_sine_recipe(joint_names, SIM_DT),
+        make_zero_recipe(num_joints=num_joints, dt=SIM_DT),
+        make_bias_recipe(joint_names=joint_names, dt=SIM_DT),
+        make_sine_recipe(joint_names=joint_names, dt=SIM_DT),
+        make_single_joint_linear_recipe(
+            target_joint_name="dof_right_knee_04",
+            start_pos=0.0,
+            end_pos=-13.0,
+            num_steps=1000,
+            joint_names=joint_names,
+            dt=SIM_DT,
+        ),
     ]
     for recipe in recipes:
         out_path = build_kinfer_file(recipe, joint_names, out_dir)
