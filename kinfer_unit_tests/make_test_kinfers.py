@@ -52,7 +52,7 @@ JOINT_BIASES: list[tuple[str, float, float]] = [
 
 JOINT_INVERSIONS: list[tuple[str, int]] = [
     ("dof_right_shoulder_pitch_03", 1),  # 0
-    ("dof_right_shoulder_roll_03", 1),  # 1
+    ("dof_right_shoulder_roll_03", -1),  # 1
     ("dof_right_shoulder_yaw_02", 1),  # 2
     ("dof_right_elbow_02", -1),  # 3
     ("dof_right_wrist_00", 1),  # 4
@@ -249,7 +249,7 @@ def get_left_right_pairs(joint_names: list[str]) -> list[tuple[int, int]]:
 def make_echo_recipe(joint_names: list[str], dt: float) -> Recipe:
     """Left-side joints run a small sine wave.
 
-    Right-side joints copy (echo) the *observed* pose of their left counterparts.
+    Right-side joints copy (echo) the observed pose of their left counterparts.
     """
     num_joints = len(joint_names)
     bias_vec = get_bias_vector(joint_names)
@@ -257,11 +257,11 @@ def make_echo_recipe(joint_names: list[str], dt: float) -> Recipe:
     lr_pairs = get_left_right_pairs(joint_names)
 
     left_idx, right_idx = zip(*lr_pairs)
-    left_idx_arr = jnp.array(left_idx, dtype=jnp.int32)  # (L,)
-    right_idx_arr = jnp.array(right_idx, dtype=jnp.int32)  # (L,)
+    left_idx_arr = jnp.array(left_idx, dtype=jnp.int32)  # (J/2)
+    right_idx_arr = jnp.array(right_idx, dtype=jnp.int32)  # (J/2)
 
-    amps = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][0] for i in left_idx])  # (L,)
-    freqs = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][1] for i in left_idx])  # (L,)
+    amps = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][0] for i in left_idx])  # (J/2)
+    freqs = jnp.array([JOINT_SINE_PARAMS[joint_names[i]][1] for i in left_idx])  # (J/2)
 
     idxs = jnp.arange(num_joints)  # (J,)
     carry_size = (1,)  # [time]
@@ -281,37 +281,37 @@ def make_echo_recipe(joint_names: list[str], dt: float) -> Recipe:
     ) -> tuple[Array, Array]:
         t = carry[0] + dt
 
-        left_offsets = amps * jnp.sin(2 * jnp.pi * freqs * t)  # (L,)
+        left_offsets = amps * jnp.sin(2 * jnp.pi * freqs * t)  # (J/2)
 
-        # Make a full-length vector of offsets for the left limbs.
-        # i.e. Left offset if it's a left limb, 0 otherwise.
-        offsets_full = jnp.sum(  # (J,)
+        # Make a J-length vector of offsets for the left limbs.
+        # i.e. Left offset if it's a left limb, 0.0 otherwise.
+        full_left_offsets = jnp.sum(  # (J,)
             jnp.where(
-                idxs[:, None] == left_idx_arr,  # shape (J,L) bool
-                left_offsets[None, :],  # broadcast (1,L) → (J,L)
+                idxs[:, None] == left_idx_arr,
+                left_offsets[None, :],
                 0.0,
             ),
             axis=1,
         )
 
+        # Get the current left angles to echo
         left_angles_now = joint_angles[left_idx_arr]
         right_targets = jnp.sum(
             jnp.where(
-                idxs[:, None] == right_idx_arr,  # shape (J,L) bool
+                idxs[:, None] == right_idx_arr,
                 left_angles_now[None, :],
                 0.0,
             ),
             axis=1,
         )
 
-        right_mask = jnp.sum(idxs[:, None] == right_idx_arr, axis=1).astype(bool)
-
         # Sine for left limbs
-        targets = bias_vec + offsets_full
+        targets = bias_vec + full_left_offsets
         # Echo for right limbs
+        right_mask = jnp.sum(idxs[:, None] == right_idx_arr, axis=1).astype(bool)
         targets = jnp.where(right_mask, right_targets, targets)
 
-        # Apply joint inversions
+        # Apply joint inversions (some joints rotate counter-clockwise)
         targets = targets * inversion_vec
 
         return targets, jnp.array([t])
