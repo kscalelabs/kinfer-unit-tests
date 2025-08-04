@@ -115,8 +115,6 @@ def make_zero_recipe(num_joints: int, dt: float) -> Recipe:
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        quaternion: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -151,8 +149,6 @@ def make_bias_recipe(joint_names: list[str], dt: float) -> Recipe:
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        quaternion: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -181,8 +177,6 @@ def make_sine_recipe(joint_names: list[str], dt: float) -> Recipe:
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        quaternion: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -210,8 +204,6 @@ def make_single_joint_linear_recipe(
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        quaternion: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -274,8 +266,6 @@ def make_echo_recipe(joint_names: list[str], dt: float) -> Recipe:
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        quaternion: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
