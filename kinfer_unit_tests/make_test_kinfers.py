@@ -719,9 +719,9 @@ def _make_arm_sequential_targets(
 ) -> jnp.ndarray:
     """Helper function to generate arm sequential targets for left or right arm.
 
-    Args:
-        is_right_arm: If True, shoulder roll goes to negative limit (right arm away from body)
-                     If False, shoulder roll goes to positive limit (left arm away from body)
+    For is_right_arm:
+    - If True, shoulder roll goes to negative limit (right arm away from body)
+    - If False, shoulder roll goes to positive limit (left arm away from body)
     """
     targets = bias_vec.copy()
 
@@ -858,9 +858,9 @@ def _make_arm_sequential_targets(
 ) -> jnp.ndarray:
     """Helper function to generate arm sequential targets for left or right arm.
 
-    Args:
-        is_right_arm: If True, shoulder roll goes to negative limit (right arm away from body)
-                     If False, shoulder roll goes to positive limit (left arm away from body)
+    For is_right_arm:
+    - If True, shoulder roll goes to negative limit (right arm away from body)
+    - If False, shoulder roll goes to positive limit (left arm away from body)
     """
     targets = bias_vec.copy()
 
@@ -982,109 +982,6 @@ def _make_arm_sequential_targets(
     targets = targets.at[wrist_idx].set(wrist_target)
 
     return targets
-
-
-def make_both_arms_sequential_recipe(joint_names: list[str], dt: float, motion_duration: float = 2.0) -> Recipe:
-    """Sequentially tests both arms: left arm sequence, then right arm sequence, looping forever.
-
-    Sequence:
-    1. Left arm full sequence (15 phases)
-    2. Right arm full sequence (15 phases)
-    3. Loop back to left arm
-    """
-    # Left arm joint names for IDs 11-15
-    left_arm_joint_names = [
-        "dof_left_shoulder_pitch_03",  # ID 11
-        "dof_left_shoulder_roll_03",  # ID 12
-        "dof_left_shoulder_yaw_02",  # ID 13
-        "dof_left_elbow_02",  # ID 14
-        "dof_left_wrist_00",  # ID 15
-    ]
-
-    # Right arm joint names for IDs 21-25
-    right_arm_joint_names = [
-        "dof_right_shoulder_pitch_03",  # ID 21
-        "dof_right_shoulder_roll_03",  # ID 22
-        "dof_right_shoulder_yaw_02",  # ID 23
-        "dof_right_elbow_02",  # ID 24
-        "dof_right_wrist_00",  # ID 25
-    ]
-
-    # Get indices for both arms
-    left_target_indices = jnp.array([joint_names.index(name) for name in left_arm_joint_names])
-    right_target_indices = jnp.array([joint_names.index(name) for name in right_arm_joint_names])
-    bias_vec = get_bias_vector(joint_names)
-
-    # Get motion limits for both arms
-    left_min_offsets, left_max_offsets = get_motion_limits(left_arm_joint_names)
-    right_min_offsets, right_max_offsets = get_motion_limits(right_arm_joint_names)
-
-    # Motion parameters
-    phase_duration = motion_duration
-    arm_phases = 15  # 15 phases per arm
-    total_phases = arm_phases * 2  # Left arm + Right arm
-    full_cycle_time = total_phases * phase_duration
-
-    carry_size = (1,)  # [time]
-
-    @jax.jit
-    def init_fn() -> Array:
-        return jnp.zeros(carry_size)
-
-    @jax.jit
-    def step_fn(
-        joint_angles: Array,
-        joint_angular_velocities: Array,
-        command: Array,
-        carry: Array,
-    ) -> tuple[Array, Array]:
-        t = carry[0] + dt
-
-        # Calculate which arm and phase we're in
-        cycle_time = t % full_cycle_time
-        global_phase = jnp.floor(cycle_time / phase_duration).astype(jnp.int32)
-        global_phase = jnp.clip(global_phase, 0, total_phases - 1)
-
-        # Determine if we're testing left arm (phases 0-14) or right arm (phases 15-29)
-        is_left_arm_phase = global_phase < arm_phases
-        arm_phase = jnp.where(is_left_arm_phase, global_phase, global_phase - arm_phases)
-
-        # Time progress within current phase (0.0 to 1.0)
-        phase_time = cycle_time % phase_duration
-        progress = jnp.minimum(phase_time / phase_duration, 1.0)
-
-        # Generate targets for left arm when active
-        left_targets = _make_arm_sequential_targets(
-            joint_names,
-            left_arm_joint_names,
-            left_target_indices,
-            left_min_offsets,
-            left_max_offsets,
-            bias_vec,
-            arm_phase,
-            progress,
-            is_right_arm=False,
-        )
-
-        # Generate targets for right arm when active
-        right_targets = _make_arm_sequential_targets(
-            joint_names,
-            right_arm_joint_names,
-            right_target_indices,
-            right_min_offsets,
-            right_max_offsets,
-            bias_vec,
-            arm_phase,
-            progress,
-            is_right_arm=True,
-        )
-
-        # Select which arm's targets to use
-        targets = jnp.where(is_left_arm_phase, left_targets, right_targets)
-
-        return targets, jnp.array([t])
-
-    return Recipe("kbot_both_arms_sequential", init_fn, step_fn, NUM_COMMANDS, carry_size)
 
 
 def make_both_arms_simultaneous_recipe(joint_names: list[str], dt: float, motion_duration: float = 2.0) -> Recipe:
@@ -1463,9 +1360,9 @@ def _make_leg_sequential_targets(
     Phase 15: Hip roll -> bias
     Phase 16: Arm shoulder pitch -> bias
 
-    Args:
-        is_right_leg: If True, right leg moves hip roll positive first (away from body)
-                     If False, left leg moves hip roll negative first (away from body)
+    For is_right_leg:
+    - If True, right leg moves hip roll positive first (away from body)
+    - If False, left leg moves hip roll negative first (away from body)
     """
     targets = bias_vec.copy()
 
@@ -1498,7 +1395,7 @@ def _make_leg_sequential_targets(
     knee_max = knee_bias + leg_max_offsets[3]
     ankle_min = ankle_bias + leg_min_offsets[4]
     ankle_max = ankle_bias + leg_max_offsets[4]
-    shoulder_pitch_min = shoulder_pitch_bias + arm_min_offsets[0]
+    # shoulder_pitch_min = shoulder_pitch_bias + arm_min_offsets[0] # Never used
     shoulder_pitch_max = shoulder_pitch_bias + arm_max_offsets[0]
 
     # Determine hip roll safe directions based on which leg
