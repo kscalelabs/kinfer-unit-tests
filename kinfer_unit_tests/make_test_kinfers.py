@@ -263,7 +263,6 @@ def make_step_recipe(
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -356,7 +355,6 @@ def make_step_echo_recipe(
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -599,7 +597,6 @@ def make_imu_arm_recipe(joint_names: list[str], dt: float, motion_duration: floa
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         projected_gravity: Array,
         gyroscope: Array,
@@ -1031,7 +1028,6 @@ def make_both_arms_sequential_recipe(joint_names: list[str], dt: float, motion_d
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1120,7 +1116,6 @@ def make_both_arms_simultaneous_recipe(joint_names: list[str], dt: float, motion
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1201,7 +1196,6 @@ def make_left_arm_sequential_recipe(joint_names: list[str], dt: float, motion_du
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1271,7 +1265,6 @@ def make_right_arm_sequential_recipe(joint_names: list[str], dt: float, motion_d
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1349,7 +1342,6 @@ def make_both_arms_sequential_recipe(joint_names: list[str], dt: float, motion_d
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1624,7 +1616,6 @@ def make_left_leg_sequential_recipe(joint_names: list[str], dt: float, motion_du
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1704,7 +1695,6 @@ def make_right_leg_sequential_recipe(joint_names: list[str], dt: float, motion_d
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1792,7 +1782,6 @@ def make_both_legs_sequential_recipe(joint_names: list[str], dt: float, motion_d
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
@@ -1891,7 +1880,6 @@ def make_both_legs_simultaneous_recipe(joint_names: list[str], dt: float, motion
     def step_fn(
         joint_angles: Array,
         joint_angular_velocities: Array,
-        initial_heading: Array,
         command: Array,
         carry: Array,
     ) -> tuple[Array, Array]:
